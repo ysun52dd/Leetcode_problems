@@ -1,0 +1,351 @@
+Data Structure
+
+//  data structure
+//
+//  Created by SunYutong on 8/7/18.
+//  Copyright © 2018 SunYutong. All rights reserved.
+//
+
+#include <iostream>
+#include <string>
+#include <stack>
+using namespace std;
+// lintcode: Expression Expand
+// given an expression s includes numbers, letters and brackets. Number represents the numbers of repetitions inside the brackets(can be a string or another expression). Please expand expression to be a string.
+
+// memory:
+// heap (new)
+// stack (8MB for a process)
+struct Element {
+    string s;
+    int n;
+    Element(string str):s(str){}
+    Element(int num): n(num){}
+};
+// pop all the string out until the top of the stack is a number, store the string in reverse order and return the string
+// return the string inside brackets if we meet a ']'
+string popStack(stack<Element>& s) {
+    // use of another stack, to ensure the right order of string
+    stack<string> buffer;
+    // move all chars to buffer until we meet a number
+    while(!s.empty() && !s.top().s.empty()) {
+        buffer.push(s.top().s);
+        s.pop();
+    }
+    string result;
+    while (!buffer.empty()) {
+        result.append(buffer.top());
+        buffer.pop();
+    }
+    return result;
+}
+
+string expressionExpand(string s){
+    stack<Element> stack;
+    int number=0;
+    int l=s.length();
+    for(int i=0; i<l;i++) {
+        char c=s[i];
+        if(isdigit(c)) {
+            number=number*10 + c - '0';
+        }
+        else if(c=='[') {
+            //Element e=Element(number);
+            stack.push(Element(number));
+            number=0;
+        } else if(c==']') {
+            string str=popStack(stack);
+            Element num=stack.top();
+            stack.pop();
+            for(int i=0; i<num.n; i++){
+                stack.push(Element(str));
+            }
+        } else {
+            string a;
+            a.append(1,c);
+            stack.push(Element(a));
+        }
+    }
+    return popStack(stack);
+}
+
+// 341. Flatten Nested List Iterator
+// Given a nested list of integers, implement an iterator to flatten it.
+//Each element is either an integer, or a list -- whose elements may also be integers or other lists.
+/**
+ * // This is the interface that allows for creating nested lists.
+ * // You should not implement it, or speculate about its implementation
+ * class NestedInteger {
+ *   public:
+ *     // Return true if this NestedInteger holds a single integer, rather than a nested list.
+ *     bool isInteger() const;
+ *
+ *     // Return the single integer that this NestedInteger holds, if it holds a single integer
+ *     // The result is undefined if this NestedInteger holds a nested list
+ *     int getInteger() const;
+ *
+ *     // Return the nested list that this NestedInteger holds, if it holds a nested list
+ *     // The result is undefined if this NestedInteger holds a single integer
+ *     const vector<NestedInteger> &getList() const;
+ * };
+ */
+// NOTE: Do the stack operation (if stack top is not integer, pop it and use getList() to get the vector, them push it to stack) in hasNext() function.
+// do not do it again in next() function!!!
+class NestedIterator {
+public:
+    stack<NestedInteger> s;
+    // push all elements in vector to stack (without breaking list) in reverse order
+    // make top of stack the next element that will be visited
+    void pushListToStack(vector<NestedInteger> &nestedList) {
+        // use a temp to reverse the order
+        stack<NestedInteger> temp;
+
+        // don't expand all lists in this step using recursion
+        // stack overflow will happen, we need to allocate a stack in heap to do the same thing
+        for(auto n:nestedList) {
+            temp.push(n);
+        }
+        while(!temp.empty()) {
+            s.push(temp.top());
+            temp.pop();
+           
+        }
+    }
+    NestedIterator(vector<NestedInteger> &nestedList) {
+        //s=stack<NestedInteger>();
+        pushListToStack(nestedList);
+    }
+    
+    // get the next element
+    int next() {
+        if(!hasNext()) {
+            return NULL;
+        }
+        int n=s.top().getInteger();
+        s.pop();
+        return n;
+    }
+    
+    // Check if there is a next element in the list
+    bool hasNext() {
+        // if the top of the stack (the next element in vector) is not an integer (means it is a list)
+        // and the stack is not empty, we need to pop the list out and push its elements back to stack in reverse order
+        vector<NestedInteger> list;
+        while(!s.empty() && !s.top().isInteger()) {
+            // ********* need to remember!!! ****************
+            // can't call pushListToStack(s.top().getList()) ???
+            // s.top() won't be popped until the next line of code
+            list=s.top().getList();
+            s.pop();
+            pushListToStack(list);
+        }
+        // if stack is not empty, the list has next NestedInteger.
+        return !s.empty();
+    }
+};
+
+// 146. LRU Cache
+// Design:
+// Design and implement a data structure for Least Recently Used (LRU) cache. It should support the following operations: get and put.
+
+//get(key) - Get the value (will always be positive) of the key if the key exists in the cache, otherwise return -1.
+//put(key, value) - Set or insert the value if the key is not already present. When the cache reached its capacity, it should invalidate the least recently used item before inserting a new item.
+//
+//Follow up:
+//Could you do both operations in O(1) time complexity?
+class Node {
+public:
+    int key, value;
+    Node *next;
+    Node(int key, int value) {
+        next = NULL;
+        this->key = key;
+        this->value = value;
+    }
+    Node() {
+        this->next = NULL;
+        this->key = 0;
+        this->value = 0;
+    }
+};
+
+class LRUCache {
+private:
+    //vector<int>
+    unordered_map<int, Node*> map;
+    int c,size;
+    Node* head; // decleare 2 pointers in 2 lines
+    Node* tail;
+    
+    void moveToTail(Node* prev) {
+        if(prev==NULL) return;
+        // 1. Do nothing if the current node is at the tail
+        if(prev->next==tail) return;
+    // ******** NOTE: (1)(2)(3)(4)(5) is a routine to move a node (the node prev->next points to) in linked list to the end of the list ********
+        Node* temp=prev->next; // (1)
+        prev->next=temp->next; // (2)
+        // 2. update pointer in hash table for the next node of the moved node, since the pointer points to it just changed
+        if(temp->next!=NULL) {
+            map[temp->next->key]=prev;
+        }
+        temp->next=NULL; // (3)
+        tail->next=temp; // (4)
+        // 3. update the pointer points to moved node in hash table before the tail pointer (the pointer points to its previous node) is moved
+        map[temp->key]=tail;
+        tail=temp; // (5)
+    }
+    
+public:
+    
+    LRUCache(int capacity) {
+        this->c=capacity; // 1. Set the capacity.
+        this->size=0; // 2. Set current size to 0 since cache is empty.
+        this->head=new Node(0,0); //3. make a dummy node, and point the pointer head to it. Set tail also point to dummy node.
+        this->tail=head;
+    }
+    
+    int get(int key) {
+        // 1. If the key exits in the map, move the next node of the node that map[key] points to to the tail, return the value in the next node.
+        if(map.find(key)!=map.end())
+        {
+            moveToTail(map[key]);
+            return map[key]->next->value; // NOTE: the value that key maps to is in the next node of map[key]
+        } // 2. If the key does not exit in map, return -1 (illegal).
+        else
+            return -1;
+    }
+    
+    void put(int key, int value) {
+        // 1. Check if the key already exits in map, move the node to tail, and update the value of the node map[key]->next points to
+        if(map.find(key)!=map.end()) {
+            moveToTail(map[key]);
+            tail->value=value;
+        } else { // 2. If it is a new key, create it.
+            Node* n=new Node(key,value);
+            // 3. Check if the size reaches capacity, if so, remove the first node (least recently used node) in the linked list, move head pointer back, and erase the key of the LRU node in hash table
+            if(size==c) {
+                // remove the key of the next node of head in map
+                if(head->next!=NULL) // make sure no null pointer access
+                    map.erase(head->next->key);
+                Node* temp=head;
+                head=head->next;
+                temp->next=NULL;
+                delete temp;
+                size--; // decrement size
+            }
+            // 4. Connect the new node to the end of the list, update map[key] and increase size
+            tail->next=n;
+            map[key]=tail;
+            tail=n;
+            size++;
+        }
+    }
+};
+
+// Top k largest number ii:
+// priority queue: (heap)
+bool cmp(const int& a, const int& b) {
+    return a > b;
+}
+
+class Solution {
+private:
+    priority_queue<int, vector<int>, greater<int>> queue;
+    int k;
+    
+public:
+    Solution(int k) {
+        this->k = k;
+    }
+    
+    void add(int num) {
+        if (queue.size() < k) {
+            queue.push(num);
+        } else if (queue.top() < num) {
+            queue.pop();
+            queue.push(num);
+        }
+    }
+    
+    vector<int> topk() {
+        vector<int> topk;
+        int n = queue.size();
+        for (int i = 0; i < k && i < n ; ++i) {
+            topk.push_back(queue.top());
+            queue.pop();
+        }
+        
+        for (int i = 0; i < n; ++i)
+            queue.push(topk[i]);
+        
+        sort(topk.begin(), topk.end(), cmp);
+        return topk;
+    }
+    
+    
+// 239. Sliding Window Maximum
+    // heap: (deque)
+    vector<int> maxSlidingWindow(vector<int>& nums, int k) {
+        deque<int> window;
+        vector<int> result;
+        int size=nums.size();
+        if(size==0) return result;
+        // 1. push all first k elements int the window into the deque
+        for(int i=0; i<k; i++) {
+            // everything in front of nums[i] is >= nums[i]
+            // and the original rank is reserved
+            while(!window.empty() && window.back()<nums[i]){
+                window.pop_back();
+            }
+            window.push_back(nums[i]);
+        }
+        // 2. The front of the deque is the current max in the window
+        result.push_back(window.front());
+        for(int i=k; i<size; i++) {
+            // 3. pop the front of the deque if the front of the deque == the element just before the first element of the window right now
+            if(window.front()==nums[i-k])
+                window.pop_front();
+            // 4. push a new element to the back of the window
+            while(!window.empty() && window.back()<nums[i] ){
+                window.pop_back();
+                //cout<<"in\n";
+            }
+            window.push_back(nums[i]);
+            // 5. push the max of the current window into result vector
+            result.push_back(window.front());
+        }
+        return result;
+    }
+    // java solution:
+//    public int[] maxSlidingWindow(int[] nums, int k) {
+//        if(nums == null || nums.length == 0 ) return new int[0];
+//        int[] result = new int[nums.length - k + 1];
+//        int index = 0;
+//
+//        PriorityQueue<Integer> queue = new PriorityQueue<Integer>(Collections.reverseOrder());
+//        for(int i = 0; i < nums.length; i++){
+//            queue.offer(nums[i]);
+//            if(queue.size() == k){
+//                result[index++] = queue.peek();
+//                queue.remove(nums[i+1-k]);
+//            }
+//        }
+//
+//        return result;
+//    }
+/**
+ * Your NestedIterator object will be instantiated and called as such:
+ * NestedIterator i(nestedList);
+ * while (i.hasNext()) cout << i.next();
+ */
+int main(int argc, const char * argv[]) {
+    // insert code here...
+    string input="ab3[2[h]ee]";
+    string solution=expressionExpand(input);
+//    for(int i=0; i<solution.length();i++)
+//        cout<<solution[i];
+    cout<<solution;
+    //std::cout << "Hello, World!\n";
+    return 0;
+}
+
